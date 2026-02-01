@@ -1,0 +1,42 @@
+[
+  {
+    "id": "cpu-intel-core-i9-14900k",
+    "name": "Core i9-14900K",
+    "manufacturer": "Intel",
+    "market": "Desktop",
+    "family": "Core i9",
+    "series": "14th Gen",
+    "codename": "Raptor Lake Refresh",
+    "socket": "LGA 1700",
+    "releaseDate": "2023-10-17",
+    "launchPrice": 589,
+    "currentPriceUsd": 549,
+    "cores": 24,
+    "threads": 32,
+    "baseClock": 3.2,
+    "boostClock": 6.0,
+    "tdp": 125,
+    "lithography": "10 nm",
+    "category": "cpu"
+  },
+  {
+    "id": "cpu-amd-ryzen-9-7950x3d",
+    "name": "Ryzen 9 7950X3D",
+    "manufacturer": "AMD",
+    "market": "Desktop",
+    "family": "Ryzen 9",
+    "series": "7000 Series",
+    "codename": "Raphael",
+    "socket": "AM5",
+    "releaseDate": "2023-02-28",
+    "launchPrice": 699,
+    "currentPriceUsd": 599,
+    "cores": 16,
+    "threads": 32,
+    "baseClock": 4.2,
+    "boostClock": 5.7,
+    "tdp": 120,
+    "lithography": "5 nm",
+    "category": "cpu"
+  }
+]
