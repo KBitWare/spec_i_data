@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-02-01T11:41:45.635500Z",
+  "baseUrl": "https://KBitWare.github.io/spec_i_data/",
+  "priority": "normal",
+  "releaseNotes": "Initial database release",
+  "highlights": [
+    "Intel Core i9-14900K",
+    "AMD Ryzen 9 7950X3D"
+  ],
+  "categories": {
+    "cpu": {
+      "category": "cpu",
+      "version": "1.0.0",
+      "buildNumber": 10000,
+      "lastUpdated": "2026-02-01T11:41:45.646487Z",
+      "itemCount": 2,
+      "sha256Hash": "ff99f1d6d0077ac9068ae1491dd7b313d08060c093e3a0bcdebe2b2ae3a96a3a",
+      "fullSizeBytes": 984,
+      "fullDatabaseUrl": "database/cpu_database_v1.0.0.json",
+      "deltaUpdates": []
+    }
+  },
+  "hotfixes": [],
+  "minAppVersion": "1.0.0"
+}
