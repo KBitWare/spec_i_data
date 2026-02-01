@@ -1,0 +1,41 @@
+[
+  {
+    "id": "soc-apple-m3-max",
+    "name": "Apple M3 Max",
+    "manufacturer": "Apple",
+    "market": "Laptop",
+    "family": "Apple Silicon",
+    "series": "M3",
+    "codename": "M3 Max",
+    "releaseDate": "2023-10-30",
+    "cpuCores": 16,
+    "cpuPerformanceCores": 12,
+    "cpuEfficiencyCores": 4,
+    "gpuCores": 40,
+    "neuralEngineCores": 16,
+    "maxMemory": 128,
+    "memoryBandwidth": 400,
+    "tdp": 92,
+    "lithography": "3 nm",
+    "category": "soc"
+  },
+  {
+    "id": "soc-qualcomm-snapdragon-8-gen-3",
+    "name": "Snapdragon 8 Gen 3",
+    "manufacturer": "Qualcomm",
+    "market": "Mobile",
+    "family": "Snapdragon",
+    "series": "8 Gen 3",
+    "codename": "SM8650",
+    "releaseDate": "2023-10-24",
+    "cpuCores": 8,
+    "cpuPerformanceCores": 1,
+    "cpuEfficiencyCores": 7,
+    "gpuName": "Adreno 750",
+    "aiAccelerator": "Hexagon",
+    "modem": "X75 5G",
+    "tdp": 12,
+    "lithography": "4 nm",
+    "category": "soc"
+  }
+]
