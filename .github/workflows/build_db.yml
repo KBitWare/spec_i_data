@@ -7,7 +7,7 @@ on:
       force_rebuild:
         description: 'Force rebuild even if sources unchanged'
         required: false
-        default: 'false'
+        default: false
         type: boolean
   # Run automatically every Sunday at 00:00 UTC
   schedule:
@@ -99,14 +99,13 @@ jobs:
 
       # ── 6. Seed the version file so the script produces the right number ─
       - name: Seed version file
+        env:
+          NEW_VERSION: ${{ steps.ver.outputs.new_version }}
         run: |
           mkdir -p assets
           # The build script reads this value and adds 1, so we seed with
           # (new_version - 1) so the output is exactly new_version.
-          echo "${{ steps.ver.outputs.new_version - 1 }}" \
-            | awk '{print $1 - 1}' > assets/db_version.txt
-          # Simpler: just echo new_version - 1 directly via bash arithmetic
-          echo "$(( ${{ steps.ver.outputs.new_version }} - 1 ))" > assets/db_version.txt
+          echo "$(( NEW_VERSION - 1 ))" > assets/db_version.txt
           cat assets/db_version.txt
 
       # ── 7. Build the database ─────────────────────────────────────────────
