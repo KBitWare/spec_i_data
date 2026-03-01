@@ -1,0 +1,187 @@
+name: Build & Release Database
+
+on:
+  # Run manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if sources unchanged'
+        required: false
+        default: 'false'
+        type: boolean
+  # Run automatically every Sunday at 00:00 UTC
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  build:
+    name: Build spec_i.db and publish release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed to create releases and push tags
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      # ── 1. Checkout this (data) repo ─────────────────────────────────────
+      - name: Checkout spec_i_data
+        uses: actions/checkout@v4
+
+      # ── 2. Checkout the app repo (for the build script) ──────────────────
+      - name: Checkout spec_i (build tools)
+        uses: actions/checkout@v4
+        with:
+          repository: KBitWare/spec_i
+          path: _spec_i_app
+
+      # ── 3. Set up Python ─────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 4. Determine next version number ─────────────────────────────────
+      - name: Compute next version
+        id: ver
+        run: |
+          # Get the latest release tag (e.g. "v5"), strip the 'v', default to 0
+          LATEST=$(gh release list \
+            --repo "${{ github.repository }}" \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName // "v0"' 2>/dev/null || echo "v0")
+          CURRENT=$(echo "$LATEST" | sed 's/[^0-9]//g')
+          CURRENT=${CURRENT:-0}
+          NEW_VER=$((CURRENT + 1))
+          echo "new_version=$NEW_VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW_VER" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEW_VER (previous tag: $LATEST)"
+
+      # ── 5. Download source CSV datasets ──────────────────────────────────
+      - name: Download Intel processor dataset
+        run: |
+          mkdir -p database/raw
+          # toUpperCase78/intel-processors — try several known file names
+          for FILE in \
+            "Intel_Processors_v1.9.csv" \
+            "Intel_Processors_v2.0.csv" \
+            "Intel_Processors.csv"; do
+            URL="https://raw.githubusercontent.com/toUpperCase78/intel-processors/master/$FILE"
+            if curl -fsSL "$URL" -o "database/raw/$FILE" 2>/dev/null; then
+              echo "Downloaded Intel CSV: $FILE"
+              break
+            fi
+          done
+          ls -lh database/raw/
+
+      - name: Download AMD processor dataset
+        run: |
+          # felixsteinke/cpu-spec-dataset — try both path variants
+          curl -fsSL \
+            "https://raw.githubusercontent.com/felixsteinke/cpu-spec-dataset/main/documented-datasets/amd-cpus.csv" \
+            -o database/raw/amd-cpus.csv 2>/dev/null || \
+          curl -fsSL \
+            "https://raw.githubusercontent.com/felixsteinke/cpu-spec-dataset/main/amd-cpus.csv" \
+            -o database/raw/amd-cpus.csv
+          echo "AMD CSV downloaded: $(wc -l < database/raw/amd-cpus.csv) lines"
+
+      - name: Download benchmark dataset (optional)
+        run: |
+          curl -fsSL \
+            "https://raw.githubusercontent.com/felixsteinke/cpu-spec-dataset/main/documented-datasets/benchmark-cpus.csv" \
+            -o database/raw/benchmark-cpus.csv 2>/dev/null || \
+          curl -fsSL \
+            "https://raw.githubusercontent.com/felixsteinke/cpu-spec-dataset/main/benchmark-cpus.csv" \
+            -o database/raw/benchmark-cpus.csv 2>/dev/null || \
+          echo "Benchmark CSV not available — skipping (non-fatal)"
+
+      # ── 6. Seed the version file so the script produces the right number ─
+      - name: Seed version file
+        run: |
+          mkdir -p assets
+          # The build script reads this value and adds 1, so we seed with
+          # (new_version - 1) so the output is exactly new_version.
+          echo "${{ steps.ver.outputs.new_version - 1 }}" \
+            | awk '{print $1 - 1}' > assets/db_version.txt
+          # Simpler: just echo new_version - 1 directly via bash arithmetic
+          echo "$(( ${{ steps.ver.outputs.new_version }} - 1 ))" > assets/db_version.txt
+          cat assets/db_version.txt
+
+      # ── 7. Build the database ─────────────────────────────────────────────
+      - name: Build spec_i.db
+        run: |
+          mkdir -p tools
+          cp _spec_i_app/tools/build_database.py tools/build_database.py
+          python tools/build_database.py
+
+      # ── 8. Verify output ─────────────────────────────────────────────────
+      - name: Verify database
+        run: |
+          python3 - <<'EOF'
+          import sqlite3
+          db = sqlite3.connect("assets/spec_i.db")
+          rows = db.execute(
+              "SELECT brand, COUNT(*) AS n FROM cpus GROUP BY brand ORDER BY brand"
+          ).fetchall()
+          total = sum(r[1] for r in rows)
+          print(f"\n{'Brand':<10} {'Count':>6}")
+          print("-" * 18)
+          for brand, count in rows:
+              print(f"{brand:<10} {count:>6,}")
+          print("-" * 18)
+          print(f"{'TOTAL':<10} {total:>6,}")
+          meta = dict(db.execute("SELECT key, value FROM db_metadata").fetchall())
+          print(f"\nVersion     : {meta.get('version', '?')}")
+          print(f"Last updated: {meta.get('last_updated', '?')}")
+          assert total > 0, "Database is empty — aborting release!"
+          db.close()
+          EOF
+
+      # ── 9. Create GitHub release ──────────────────────────────────────────
+      - name: Create release
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          VERSION="${{ steps.ver.outputs.new_version }}"
+          TOTAL=$(python3 -c "
+          import sqlite3
+          db = sqlite3.connect('assets/spec_i.db')
+          print(db.execute('SELECT COUNT(*) FROM cpus').fetchone()[0])
+          ")
+          INTEL=$(python3 -c "
+          import sqlite3
+          db = sqlite3.connect('assets/spec_i.db')
+          r = db.execute(\"SELECT COUNT(*) FROM cpus WHERE brand='Intel'\").fetchone()
+          print(r[0])
+          ")
+          AMD=$(python3 -c "
+          import sqlite3
+          db = sqlite3.connect('assets/spec_i.db')
+          r = db.execute(\"SELECT COUNT(*) FROM cpus WHERE brand='AMD'\").fetchone()
+          print(r[0])
+          ")
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Database v$VERSION" \
+            --notes "## Spec-I Database v$VERSION
+
+          **Released:** $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          ### Contents
+          | Brand  | CPUs  |
+          |--------|-------|
+          | Intel  | $INTEL |
+          | AMD    | $AMD |
+          | **Total** | **$TOTAL** |
+
+          ### Sources
+          - Intel: [toUpperCase78/intel-processors](https://github.com/toUpperCase78/intel-processors)
+          - AMD + Benchmarks: [felixsteinke/cpu-spec-dataset](https://github.com/felixsteinke/cpu-spec-dataset)
+
+          ### How to update
+          Open the Spec-I app → Settings → Check for Database Update." \
+            "assets/spec_i.db"
+
+          echo "✓ Release $TAG created with spec_i.db"
